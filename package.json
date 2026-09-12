@@ -1,0 +1,8 @@
+{
+  "name": "arkanoid-test",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx http-server -p 8080 -o"
+  }
+}
