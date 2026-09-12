@@ -11,9 +11,29 @@ class ArkanoidGame {
     constructor() {
         this.WIDTH = 800;
         this.HEIGHT = 600;
-        this.state = 'MENU'; // MENU, TUTORIAL, PLAYING, GAME_OVER
+        this.state = 'MENU'; 
         this.score = 0;
+        this.soundEnabled = true;
         
+        this.bgm = new Audio('music/music.mp3');
+        this.bgm.loop = true;
+        this.bgm.volume = 0.3;
+        
+        this.wallSound = new Audio('music/wall-hit.mp3');
+        this.wallSound.volume = 0.4;
+        
+        this.paddleSound = new Audio('music/paddle-hit.mp3');
+        this.paddleSound.volume = 0.4;
+        
+        this.brickSound = new Audio('music/brick-break.mp3');
+        this.brickSound.volume = 0.5;
+        
+        this.gameOverSound = new Audio('music/game-over.mp3');
+        this.gameOverSound.volume = 0.6;
+        
+        this.victorySound = new Audio('music/victory.mp3');
+        this.victorySound.volume = 0.6;
+
         this.app = new PIXI.Application({
             width: this.WIDTH, height: this.HEIGHT,
             backgroundColor: getColor('--color-bg'), antialias: true
@@ -29,11 +49,49 @@ class ArkanoidGame {
 
     init() {
         this.createUI(); this.createPaddle(); this.createBall(); this.createBricks();
+        
         this.app.view.addEventListener('mousemove', (e) => this.handleInput(e));
         this.app.view.addEventListener('click', () => this.handleClick());
         document.addEventListener('keydown', (e) => this.handleKeyInput(e));
         this.app.ticker.add((delta) => this.update(delta));
-        this.showMessage('АРКАНОИД\n\nНажмите ПРОБЕЛ или КЛИКНИТЕ\nдля начала обучения');
+        this.showMessage('АРКАНОИД\n\nНажмите ПРОБЕЛ или КЛИКНИТЕ\nдля начала обучения\nM - вкл/выкл звук');
+    }
+
+    playEffect(audioElement) {
+        if (!this.soundEnabled) return;
+        
+        audioElement.currentTime = 0;
+        audioElement.play().catch(() => {});
+    }
+
+    toggleSound() {
+        this.soundEnabled = !this.soundEnabled;
+        
+        if (this.soundEnabled) {
+            if (this.state === 'PLAYING' || this.state === 'TUTORIAL') {
+                this.bgm.play().catch(() => {});
+            }
+            this.bgm.volume = 0.3;
+            this.wallSound.volume = 0.4;
+            this.paddleSound.volume = 0.4;
+            this.brickSound.volume = 0.5;
+            this.gameOverSound.volume = 0.6;
+            this.victorySound.volume = 0.6;
+        } else {
+            this.bgm.pause();
+            this.bgm.volume = 0;
+            this.wallSound.volume = 0;
+            this.paddleSound.volume = 0;
+            this.brickSound.volume = 0;
+            this.gameOverSound.volume = 0;
+            this.victorySound.volume = 0;
+        }
+        
+        const status = this.soundEnabled ? 'Звук ВКЛ' : 'Звук ВЫКЛ';
+        if (this.state === 'MENU' || this.state === 'GAME_OVER') {
+            const currentText = this.messageText.text.split('\nM - ')[0];
+            this.showMessage(currentText + `\nM - ${status}`);
+        }
     }
 
     showMessage(text) {
@@ -52,6 +110,7 @@ class ArkanoidGame {
         this.ball.y = this.HEIGHT - 60;
         this.ballVX = 4; this.ballVY = -4;
         this.paddle.x = (this.WIDTH - 100) / 2;
+        this.paddle.scale.set(1); 
     }
 
     createUI() {
@@ -106,12 +165,13 @@ class ArkanoidGame {
         }
     }
 
-    // === ИСПРАВЛЕННЫЕ МЕТОДЫ ===
     handleKeyInput(e) {
         if (this.state === 'MENU' && e.code === 'Space') {
             this.startTutorial();
         } else if (this.state === 'GAME_OVER' && e.code === 'Space') {
-            this.restartGame(); // Теперь при проигрыше вызывается полный рестарт
+            this.restartGame(); 
+        } else if (e.code === 'KeyM') {
+            this.toggleSound();
         }
     }
 
@@ -119,23 +179,26 @@ class ArkanoidGame {
         if (this.state === 'MENU') {
             this.startTutorial();
         } else if (this.state === 'GAME_OVER') {
-            this.restartGame(); // Теперь при проигрыше вызывается полный рестарт
+            this.restartGame();
         }
     }
-    // ============================
 
     startTutorial() {
         this.state = 'TUTORIAL';
-        this.showMessage('ОБУЧЕНИЕ\n\nУправляйте мышью.\n(Замедленная скорость)');
+        this.showMessage('ОБУЧЕНИЕ\n\nУправляйте мышью');
         this.resetPositions();
         this.ballVX = 1; 
-        this.ballVY = -1; // Замедление для обучения
+        this.ballVY = -1; 
+        
+        if (this.soundEnabled) {
+            this.bgm.currentTime = 0;
+            this.bgm.play().catch(() => {});
+        }
         
         setTimeout(() => {
             if (this.state === 'TUTORIAL') {
                 this.state = 'PLAYING';
                 this.hideMessage();
-                // Возвращаем нормальную скорость, сохраняя направление
                 this.ballVX = 4 * Math.sign(this.ballVX); 
                 this.ballVY = -4;
             }
@@ -145,21 +208,39 @@ class ArkanoidGame {
     restartGame() {
         this.score = 0;
         this.scoreText.text = 'Очки: 0';
-        this.bricks.forEach(b => { b.active = true; b.visible = true; }); // Восстанавливаем кирпичи
-        this.startTutorial(); // Рестарт всегда начинает с обучения
+        this.bricks.forEach(b => { 
+            b.active = true; 
+            b.visible = true; 
+            b.scale.set(1); 
+            b.alpha = 1;
+        }); 
+        this.startTutorial(); 
     }
 
     update(delta) {
-        if (this.state !== 'PLAYING' && this.state !== 'TUTORIAL') return;
+        if (this.state !== 'PLAYING' && this.state !== 'TUTORIAL') {
+            if (this.bgm && !this.bgm.paused && this.state === 'GAME_OVER') {
+                this.bgm.pause();
+            }
+            return;
+        }
 
         this.ball.x += this.ballVX * delta; this.ball.y += this.ballVY * delta;
         
-        if (this.ball.x < 8 || this.ball.x > this.WIDTH - 8) this.ballVX = -this.ballVX;
-        if (this.ball.y < 8) this.ballVY = -this.ballVY;
+        if (this.ball.x < 8 || this.ball.x > this.WIDTH - 8) {
+            this.ballVX = -this.ballVX;
+            this.playEffect(this.wallSound);
+        }
+        if (this.ball.y < 8) {
+            this.ballVY = -this.ballVY;
+            this.playEffect(this.wallSound);
+        }
         
         if (this.ball.y > this.HEIGHT) {
             this.state = 'GAME_OVER';
             this.showMessage(`ИГРА ОКОНЧЕНА\nОчки: ${this.score}\n\nНажмите ПРОБЕЛ для рестарта`);
+            this.playEffect(this.gameOverSound);
+            if (this.bgm) this.bgm.pause();
             return;
         }
         
@@ -167,8 +248,11 @@ class ArkanoidGame {
             this.ball.x >= this.paddle.x && this.ball.x <= this.paddle.x + 100) {
             this.ballVY = -Math.abs(this.ballVY);
             this.ballVX = (this.ball.x - (this.paddle.x + 50)) * 0.15;
-            this.paddle.scale.y = 0.7;
+            
+            this.paddle.scale.y = 0.6;
             setTimeout(() => { this.paddle.scale.y = 1; }, 100);
+            
+            this.playEffect(this.paddleSound);
         }
 
         let activeBricks = 0;
@@ -178,16 +262,36 @@ class ArkanoidGame {
             
             if (this.ball.x + 8 > brick.x && this.ball.x - 8 < brick.x + 70 &&
                 this.ball.y + 8 > brick.y && this.ball.y - 8 < brick.y + 20) {
-                brick.active = false; brick.visible = false;
+                
+                brick.active = false; 
                 this.ballVY = -this.ballVY;
                 this.score += 10;
                 this.scoreText.text = `Очки: ${this.score}`;
+                
+                this.playEffect(this.brickSound);
+
+                let frames = 0;
+                const animateDestruction = () => {
+                    frames++;
+                    brick.scale.x -= 0.1;
+                    brick.scale.y -= 0.1;
+                    brick.alpha -= 0.1;
+                    
+                    if (frames < 10) {
+                        requestAnimationFrame(animateDestruction);
+                    } else {
+                        brick.visible = false;
+                    }
+                };
+                animateDestruction();
             }
         });
 
         if (activeBricks === 0) {
             this.state = 'GAME_OVER';
             this.showMessage(`ПОБЕДА!\nОчки: ${this.score}\n\nНажмите ПРОБЕЛ для новой игры`);
+            this.playEffect(this.victorySound);
+            if (this.bgm) this.bgm.pause();
         }
     }
 }
