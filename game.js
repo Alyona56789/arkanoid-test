@@ -11,7 +11,7 @@ class ArkanoidGame {
     constructor() {
         this.WIDTH = 800;
         this.HEIGHT = 600;
-        this.state = 'MENU';
+        this.state = 'MENU'; // MENU, TUTORIAL, PLAYING, GAME_OVER
         this.score = 0;
         
         this.app = new PIXI.Application({
@@ -33,13 +33,13 @@ class ArkanoidGame {
         this.app.view.addEventListener('click', () => this.handleClick());
         document.addEventListener('keydown', (e) => this.handleKeyInput(e));
         this.app.ticker.add((delta) => this.update(delta));
-        this.showMessage('АРКАНОИД\n\nНажмите ПРОБЕЛ или КЛИКНИТЕ\nдля начала игры');
+        this.showMessage('АРКАНОИД\n\nНажмите ПРОБЕЛ или КЛИКНИТЕ\nдля начала обучения');
     }
 
     showMessage(text) {
         this.messageText.text = text;
         this.messageText.visible = true;
-        this.ball.visible = (this.state === 'PLAYING');
+        this.ball.visible = (this.state !== 'MENU');
     }
 
     hideMessage() {
@@ -98,7 +98,7 @@ class ArkanoidGame {
     }
 
     handleInput(e) {
-        if (this.state === 'PLAYING') {
+        if (this.state === 'PLAYING' || this.state === 'TUTORIAL') {
             const rect = this.app.view.getBoundingClientRect();
             this.paddle.x = (e.clientX - rect.left) - 50;
             if (this.paddle.x < 0) this.paddle.x = 0;
@@ -106,37 +106,51 @@ class ArkanoidGame {
         }
     }
 
+    // === ИСПРАВЛЕННЫЕ МЕТОДЫ ===
     handleKeyInput(e) {
         if (this.state === 'MENU' && e.code === 'Space') {
-            this.startGame();
+            this.startTutorial();
         } else if (this.state === 'GAME_OVER' && e.code === 'Space') {
-            this.restartGame(); 
+            this.restartGame(); // Теперь при проигрыше вызывается полный рестарт
         }
     }
 
     handleClick() {
         if (this.state === 'MENU') {
-            this.startGame();
+            this.startTutorial();
         } else if (this.state === 'GAME_OVER') {
-            this.restartGame(); 
+            this.restartGame(); // Теперь при проигрыше вызывается полный рестарт
         }
     }
+    // ============================
 
-    startGame() {
-        this.state = 'PLAYING';
-        this.hideMessage();
+    startTutorial() {
+        this.state = 'TUTORIAL';
+        this.showMessage('ОБУЧЕНИЕ\n\nУправляйте мышью.\n(Замедленная скорость)');
         this.resetPositions();
+        this.ballVX = 1; 
+        this.ballVY = -1; // Замедление для обучения
+        
+        setTimeout(() => {
+            if (this.state === 'TUTORIAL') {
+                this.state = 'PLAYING';
+                this.hideMessage();
+                // Возвращаем нормальную скорость, сохраняя направление
+                this.ballVX = 4 * Math.sign(this.ballVX); 
+                this.ballVY = -4;
+            }
+        }, 4000);
     }
 
     restartGame() {
         this.score = 0;
         this.scoreText.text = 'Очки: 0';
         this.bricks.forEach(b => { b.active = true; b.visible = true; }); // Восстанавливаем кирпичи
-        this.startGame();
+        this.startTutorial(); // Рестарт всегда начинает с обучения
     }
 
     update(delta) {
-        if (this.state !== 'PLAYING') return;
+        if (this.state !== 'PLAYING' && this.state !== 'TUTORIAL') return;
 
         this.ball.x += this.ballVX * delta; this.ball.y += this.ballVY * delta;
         
